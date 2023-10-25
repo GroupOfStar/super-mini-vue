@@ -16,8 +16,6 @@ export function mountElement(vnode, container) {
   }
   // 4. 插入
   container.append(el);
-
-  return { ...vnode, el };
 }
 
 /**
@@ -26,8 +24,8 @@ export function mountElement(vnode, container) {
  * @param {Vnode} n2 newVnode 新节点
  */
 export function diff(n1, n2) {
-  const { tag: oldTag, props: oldProps, el } = n1;
-  const { tag: newTag, props: newProps } = n2;
+  const { tag: oldTag, props: oldProps, el, children: oldChildren } = n1;
+  const { tag: newTag, props: newProps, children: newChildren } = n2;
   n2.el = el;
   // 1. tag
   if (oldTag !== newTag) {
@@ -50,6 +48,47 @@ export function diff(n1, n2) {
         }
       }
     }
-    // 3. children
+    // 3. children -> 暴力解法
+    //  3.1 newChildren -> string (oldChildren: string, oldChildren: array)
+    //  3.2 newChildren -> array (oldChildren: string, oldChildren: array)
+    if (typeof newChildren === "string") {
+      if (typeof oldChildren === "string") {
+        if (newChildren !== oldChildren) {
+          el.textContent = newChildren;
+        }
+      } else if (Array.isArray(oldChildren)) {
+        el.textContent = newChildren;
+      }
+    } else if (Array.isArray(newChildren)) {
+      if (typeof oldChildren === "string") {
+        el.innerText = "";
+        mountElement(n2, el);
+      } else if (Array.isArray(oldChildren)) {
+        // new {a, b, c}
+        // old {a, d, c, e}
+        const oldChildrenLen = oldChildren.length;
+        const newChildrenLen = newChildren.length;
+        const minLen = Math.min(oldChildrenLen, newChildrenLen);
+
+        // 处理公共的vnode
+        for (let index = 0; index < minLen; index++) {
+          diff(oldChildren[index], newChildren[index]);
+        }
+
+        if (newChildrenLen > minLen) {
+          // 新增
+          for (let index = minLen; index < newChildrenLen; index++) {
+            mountElement(newChildren[index], el);
+          }
+        }
+        if (oldChildrenLen > minLen) {
+          // 删除
+          for (let index = minLen; index < oldChildrenLen; index++) {
+            const oldVnodeEl = oldChildren[index].el;
+            oldVnodeEl.parentNode.removeChild(oldVnodeEl);
+          }
+        }
+      }
+    }
   }
 }
